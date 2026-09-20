@@ -17,43 +17,49 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-    exit; // Keselamatan mutlak
+    exit; // Security: block direct access
 }
 
-// 1. Semakan Kebergantungan WooCommerce
+/**
+ * 1. WooCommerce dependency check.
+ */
 function wgpt_init() {
     if ( ! class_exists( 'WooCommerce' ) ) {
         return;
     }
 
-    // Cangkuk tetapan admin dan paparan frontend
+    // Register admin settings and frontend display hooks.
     add_action( 'admin_init', 'wgpt_register_settings' );
     add_action( 'admin_menu', 'wgpt_add_settings_page' );
     add_filter( 'woocommerce_product_tabs', 'wgpt_add_global_tab' );
 }
 add_action( 'plugins_loaded', 'wgpt_init' );
 
-// 2. Daftar Tetapan dengan Keselamatan HTML (wp_kses_post)
+/**
+ * 2. Register settings with safe sanitization (wp_kses_post).
+ */
 function wgpt_register_settings() {
-    register_setting( 
-        'wgpt_settings_group', 
-        'wgpt_global_tab_content', 
-        'wp_kses_post' // SANGAT PENTING: Tapis skrip bahaya (XSS) tapi benarkan HTML asas
+    register_setting(
+        'wgpt_settings_group',
+        'wgpt_global_tab_content',
+        'wp_kses_post' // Critical: strips dangerous scripts (XSS) while allowing basic HTML
     );
-    register_setting( 
-        'wgpt_settings_group', 
-        'wgpt_global_tab_title', 
-        'sanitize_text_field' // Tajuk tab hanya perlukan teks biasa
+    register_setting(
+        'wgpt_settings_group',
+        'wgpt_global_tab_title',
+        'sanitize_text_field' // Tab title only needs plain text
     );
 }
 
-// 3. Bina Halaman Tetapan di bawah menu "Products"
+/**
+ * 3. Build the settings page under the "Products" menu.
+ */
 function wgpt_add_settings_page() {
     add_submenu_page(
-        'edit.php?post_type=product', // Letak di bawah menu Products
+        'edit.php?post_type=product', // Place under the Products menu
         esc_html__( 'Global Tab Settings', 'woo-global-product-tabs' ),
         esc_html__( 'Global Tab', 'woo-global-product-tabs' ),
-        'manage_woocommerce', // KESELAMATAN: Hanya admin/pengurus kedai boleh akses
+        'manage_woocommerce', // Security: only admins/shop managers can access
         'wgpt-global-tab',
         'wgpt_render_settings_page'
     );
@@ -63,16 +69,16 @@ function wgpt_render_settings_page() {
     if ( ! current_user_can( 'manage_woocommerce' ) ) {
         return;
     }
-    
-    $tab_title = get_option( 'wgpt_global_tab_title', 'Shipping Info' );
+
+    $tab_title   = get_option( 'wgpt_global_tab_title', 'Shipping Info' );
     $tab_content = get_option( 'wgpt_global_tab_content', '' );
     ?>
     <div class="wrap">
         <h1><?php esc_html_e( 'WooCommerce Global Product Tab', 'woo-global-product-tabs' ); ?></h1>
         <form method="post" action="options.php">
-            <?php 
-            // Output medan token keselamatan (Nonce) automatik untuk borang tetapan
-            settings_fields( 'wgpt_settings_group' ); 
+            <?php
+            // Outputs the settings nonce field automatically for the form.
+            settings_fields( 'wgpt_settings_group' );
             ?>
             <table class="form-table">
                 <tr valign="top">
@@ -84,9 +90,9 @@ function wgpt_render_settings_page() {
                 <tr valign="top">
                     <th scope="row"><?php esc_html_e( 'Tab Content', 'woo-global-product-tabs' ); ?></th>
                     <td>
-                        <?php 
-                        // Gunakan Editor WYSIWYG WordPress yang sebenar
-                        wp_editor( $tab_content, 'wgpt_global_tab_content', array( 'textarea_rows' => 15 ) ); 
+                        <?php
+                        // Use the real WordPress WYSIWYG editor.
+                        wp_editor( $tab_content, 'wgpt_global_tab_content', array( 'textarea_rows' => 15 ) );
                         ?>
                         <p class="description"><?php esc_html_e( 'This content will appear on EVERY product page.', 'woo-global-product-tabs' ); ?></p>
                     </td>
@@ -98,28 +104,32 @@ function wgpt_render_settings_page() {
     <?php
 }
 
-// 4. Suntik Tab ke Halaman Produk (Frontend)
+/**
+ * 4. Inject the tab into the product page (frontend).
+ */
 function wgpt_add_global_tab( $tabs ) {
-    $tab_title = get_option( 'wgpt_global_tab_title' );
+    $tab_title   = get_option( 'wgpt_global_tab_title' );
     $tab_content = get_option( 'wgpt_global_tab_content' );
 
-    // PRESTASI: Jangan tambah tab jika admin biarkan kandungan kosong
+    // Performance: don't add the tab if the admin left the content empty.
     if ( ! empty( $tab_content ) ) {
         $tabs['wgpt_global_tab'] = array(
             'title'    => esc_html( $tab_title ? $tab_title : 'Global Info' ),
-            'priority' => 50, // Muncul selepas Description (10) dan Reviews (30)
+            'priority' => 50, // Appears after Description (10) and Reviews (30)
             'callback' => 'wgpt_global_tab_display_content'
         );
     }
     return $tabs;
 }
 
-// Fungsi untuk memaparkan isi kandungan tab
+/**
+ * Render the tab body.
+ */
 function wgpt_global_tab_display_content() {
     $content = get_option( 'wgpt_global_tab_content' );
-    
-    // Output kandungan menggunakan echo, dan pastikan ia ditapis sekali lagi
-    // do_shortcode membolehkan admin meletakkan shortcode lain dalam tab ini!
+
+    // Sanitize once more on output. do_shortcode lets admins embed other
+    // shortcodes inside the tab.
     echo '<div class="wgpt-global-tab-wrapper">';
     echo do_shortcode( wp_kses_post( $content ) );
     echo '</div>';
