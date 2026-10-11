@@ -41,6 +41,16 @@ Not at all. The global tab content is fetched from the WordPress Options table, 
 = Can I hide the tab on specific products? =
 For Version 1.0, this is a strictly global tab designed for maximum performance and simplicity. If the content field is empty, the tab automatically hides itself site-wide.
 
+== Security ==
+
+This plugin follows WordPress security best practices:
+
+* The settings page requires the `manage_woocommerce` capability (shop managers and admins only).
+* Settings form submissions are protected by the WordPress settings nonce (`settings_fields()`).
+* Tab content is sanitized with `wp_kses_post()` on save and re-sanitized on output; the tab title uses `sanitize_text_field()` and is escaped with `esc_html()`/`esc_attr()`.
+* Direct file access is blocked with an `ABSPATH` guard.
+* No secrets or API keys are stored in the plugin code.
+
 == Changelog ==
 
 = 1.0.0 =
